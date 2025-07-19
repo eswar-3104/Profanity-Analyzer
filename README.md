@@ -18,7 +18,7 @@ A comprehensive profanity detection and content moderation tool built with Pytho
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/mrudangameswar/profanity-analyzer.git
+   git clone https://github.com/eswar-3104/profanity-analyzer.git
    cd profanity-analyzer
    ```
 
@@ -146,4 +146,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 Mrudangam Eswar - mrudangameswar2004@gmail.com
 
-Project Link: [https://github.com/mrudangameswar/profanity-analyzer](https://github.com/mrudangameswar/profanity-analyzer)
+Project Link: [https://github.com/eswar-3104/profanity-analyzer](https://github.com/eswar-3104/profanity-analyzer)
