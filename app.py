@@ -7,30 +7,34 @@ from PyPDF2 import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import Paragraph, Frame
 from reportlab.lib.units import inch
 from better_profanity import profanity
 import pdfplumber
 import datetime
-from transformers import RobertaTokenizer, RobertaModel
-
-# Load pre-trained RoBERTa tokenizer and model
-tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
-model = RobertaModel.from_pretrained("roberta-base")
 
 # Initialize profanity filter
 profanity.load_censor_words()
+
+# Download NLTK data if not already present
+import nltk
+try:
+    nltk.data.find('corpora/wordnet')
+except LookupError:
+    nltk.download('wordnet', quiet=True)
 
 # Function to find synonyms or legal alternatives based on context
 def get_legal_alternatives(word):
     from nltk.corpus import wordnet
     alternatives = []
-    for syn in wordnet.synsets(word):
-        for lemma in syn.lemmas():
-            if lemma.name() != word and not profanity.contains_profanity(lemma.name()):
-                alternatives.append(lemma.name().replace('_', ' '))
-    return alternatives if alternatives else [word]
+    try:
+        for syn in wordnet.synsets(word):
+            for lemma in syn.lemmas():
+                if lemma.name() != word and not profanity.contains_profanity(lemma.name()):
+                    alternatives.append(lemma.name().replace('_', ' '))
+        return alternatives if alternatives else [word]
+    except Exception:
+        # Return original word if WordNet lookup fails
+        return [word]
 
 # Function to replace profane words within the context of a sentence
 def replace_profanity_in_sentence(sentence):
@@ -158,8 +162,6 @@ def create_clean_pdf_output(output_path, paragraphs, profane_words):
     with open(output_path, "wb") as output_stream:
         output.write(output_stream)
 
-from reportlab.lib.colors import green
-
 # Function to add watermark (green tick and text) to each page of the PDF
 def add_watermark(input_pdf_path, watermark_text="Verified by TOX-MAS"):
     try:
@@ -237,7 +239,7 @@ uploaded_file = st.file_uploader("Upload a document", type=["txt", "pdf", "docx"
 option = st.selectbox("Choose an option", ["Choose...", "Censor", "Rephrase"])
 
 if st.button("Analyze"):
-    if uploaded_file:
+    if uploaded_file and option != "Choose...":
         file_details = {"filename": uploaded_file.name, "filetype": uploaded_file.type, "filesize": uploaded_file.size}
         st.write(file_details)
 
@@ -259,7 +261,7 @@ if st.button("Analyze"):
             st.write(f"Profane words: {profane_word_count}")
             st.write(f"Percentage of profane words: {(profane_word_count / total_words) * 100:.2f}%")
             with open(output_path, "rb") as file:
-                st.download_button(label="Download Censored Document", data=file, file_name=output_path)
+                st.download_button(label="Download Censored Document", data=file, file_name=os.path.basename(output_path))
             log_past_analysis(uploaded_file.name, "Censor", profane_word_count)
 
         elif option == "Rephrase":
@@ -272,10 +274,12 @@ if st.button("Analyze"):
                 contains_profanity |= paragraph_contains_profanity
                 output_paragraphs.append(replaced_paragraph)
 
-            output_file_path = f"rephrased_output.pdf"
+            # Create output file in temp directory with proper naming
+            base_name = os.path.splitext(uploaded_file.name)[0]
+            output_file_path = os.path.join(temp_dir, f"rephrased_{base_name}.pdf")
             create_clean_pdf_output(output_file_path, output_paragraphs, [])
             add_watermark(output_file_path, "Verified by TOX-MAS")
-            #total_words = len(' '.join(output_paragraphs).split())
+            
             profane_word_count = len([word for word in read_file(input_path).split() if check_profanity(word) == "Profane"])
             total_words = len(read_file(input_path).split())
             st.success("Document analyzed and rephrased successfully.")
@@ -283,8 +287,13 @@ if st.button("Analyze"):
             st.write(f"Percentage of profane words: {(profane_word_count / total_words) * 100:.2f}%")
             st.write(f"Number of Profane words rephrased are: {profane_word_count}")
             with open(output_file_path, "rb") as file:
-                st.download_button(label="Download Rephrased Document", data=file, file_name=output_file_path)
+                st.download_button(label="Download Rephrased Document", data=file, file_name=os.path.basename(output_file_path))
             log_past_analysis(uploaded_file.name, "Rephrase", profane_word_count)
+    
+    elif not uploaded_file:
+        st.error("Please upload a file first.")
+    elif option == "Choose...":
+        st.error("Please select either 'Censor' or 'Rephrase' option.")
             
 # Display past analysis
 st.header("Past Analysis")
